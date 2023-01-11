@@ -138,6 +138,7 @@ public void testCreateDefaultData() throws Exception {
 ![](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301111410229.png)
 
 **使用forPath设置节点的值**
+
 forPath还接收第二个参数（节点的值，字节数组类型）
 ```java
 @Test
