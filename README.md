@@ -90,3 +90,63 @@ public class ConnectionTest {
 ```
 运行完毕后查看结果：
 ![](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301111344287.png)
+
+# 创建节点
+创建节点使用`create`方法，该方法返回一个`CreateBuilder`他是一个建造者模式的类。用于创建节点。
+```java
+package com.itlab1024.curator.connection;
+
+import org.apache.curator.RetryPolicy;
+import org.apache.curator.framework.CuratorFramework;
+import org.apache.curator.framework.CuratorFrameworkFactory;
+import org.apache.curator.retry.ExponentialBackoffRetry;
+import org.junit.jupiter.api.Test;
+
+public class CreateNodeTest {
+    String connectString = "172.30.140.89:2181";
+    RetryPolicy retryPolicy = new ExponentialBackoffRetry(1000, 3);
+
+    /**
+     * 创建节点
+     */
+    @Test
+    public void testCreate1() throws Exception {
+        CuratorFramework curatorFramework = CuratorFrameworkFactory.newClient(connectString, retryPolicy);
+        curatorFramework.start();
+        curatorFramework.create().forPath("/test");
+    }
+}
+```
+创建完毕后，通过命令行查看节点：
+![](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301111419073.png)
+看到值是`10.112.33.229`,可实际上我并未给节点设置值，这个值是框架默认设置的，客户端的IP。
+这个默认值可以修改，此时不能使用`newClient`方法，需要使用工厂的builder自己构建设置。示例代码如下：
+```java
+@Test
+public void testCreateDefaultData() throws Exception {
+    CuratorFrameworkFactory.Builder builder = CuratorFrameworkFactory.builder().defaultData("默认值".getBytes(StandardCharsets.UTF_8));
+    CuratorFramework client = builder.connectString(connectString).retryPolicy(retryPolicy).build();
+    client.start();
+    client.create().forPath("/defaultDataTest");
+}
+```
+运行结果：
+![](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301111424095.png)
+可以看到，默认值已经被修改为`默认值`。
+
+创建节点时如果节点存在，则会抛出`NodeExistsException`异常
+![](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301111410229.png)
+
+**使用forPath设置节点的值**
+forPath还接收第二个参数（节点的值，字节数组类型）
+```java
+@Test
+public void testCreate2() throws Exception {
+    CuratorFramework curatorFramework = CuratorFrameworkFactory.newClient(connectString, retryPolicy);
+    curatorFramework.start();
+    curatorFramework.create().forPath("/test2", "用户自己设置的值".getBytes(StandardCharsets.UTF_8));
+}
+```
+运行结果：
+![](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301111427929.png)
+
