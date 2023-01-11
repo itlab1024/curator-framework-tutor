@@ -154,7 +154,7 @@ public void testCreate2() throws Exception {
 
 **节点模式设置**
 
-可以通过`withMode`方法设置节点的类型，为显示指定的节点都是持久性节点。
+可以通过`withMode`方法设置节点的类型，未显示指定的节点都是持久性节点。
 
 ```java
 /**
