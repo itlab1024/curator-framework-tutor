@@ -150,4 +150,30 @@ public void testCreate2() throws Exception {
 ```
 运行结果：
 ![](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301111427929.png)
+可见正确设置了值。
 
+**节点模式设置**
+
+可以通过`withMode`方法设置节点的类型，为显示指定的节点都是持久性节点。
+
+```java
+/**
+ * 设置节点类型
+ * @throws Exception
+ */
+@Test
+public void testCreate3() throws Exception {
+    CuratorFramework curatorFramework = CuratorFrameworkFactory.newClient(connectString, retryPolicy);
+    curatorFramework.start();
+    curatorFramework.create().withMode(CreateMode.EPHEMERAL).forPath("/EPHEMERAL1");
+    // 临时节点，会话结束就会删除，线程睡眠用于延长会话时间
+    TimeUnit.SECONDS.sleep(30);
+}
+```
+查看结果：
+![](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301111512167.png)
+可以看到临时节点，红色框内只有临时节点该属性才是非零。
+
+**TTL时长设置**
+
+使用`withTtl`设置时长，单位毫秒。当模式为 CreateMode.PERSISTENT_WITH_TTL 或CreateMode.PERSISTENT_SEQUENTIAL_WITH_TTL时指定 TTL。必须大于 0 且小于或等于 EphemeralType.MAX_TTL。
