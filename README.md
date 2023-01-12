@@ -34,6 +34,12 @@ pom文件
             <version>5.4.0</version>
         </dependency>
         <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>1.18.24</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
             <version>2.0.6</version>
@@ -605,3 +611,75 @@ public class TransactionTest{
 ![image-20230112180946262](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301121809319.png)
 
 可以看到`/transaction1`节点创建成功，`/transaction2`节点的值修改成功。`/transaction3`节点被删除。说明事务是有效的！
+
+
+
+---
+
+为了演示清晰，我先清理掉所有节点。
+
+![image-20230112195536876](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301121955942.png)
+
+
+
+# 监听节点
+
+本版本中`PathChildrenCache`、`PathChildrenCacheMod`、`TreeCache`都已经是过期的了，官方推荐使用`CuratorCache`。
+
+```java
+package com.itlab1024.curator.connection;
+
+import org.apache.curator.RetryPolicy;
+import org.apache.curator.framework.CuratorFramework;
+import org.apache.curator.framework.CuratorFrameworkFactory;
+import org.apache.curator.framework.api.CuratorEvent;
+import org.apache.curator.framework.api.CuratorListener;
+import org.apache.curator.framework.recipes.cache.*;
+import org.apache.curator.retry.ExponentialBackoffRetry;
+import org.apache.zookeeper.data.Stat;
+import org.junit.jupiter.api.Test;
+
+import java.util.concurrent.TimeUnit;
+
+public class CacheTest {
+    String connectString = "172.30.140.89:2181";
+    RetryPolicy retryPolicy = new ExponentialBackoffRetry(1000, 3);
+
+    /**
+     * 监听（初始化）
+     * @throws Exception
+     */
+    @Test
+    public void testCache1() throws Exception {
+        CuratorFramework curatorFramework = CuratorFrameworkFactory.newClient(connectString, retryPolicy);
+        curatorFramework.start();
+
+        CuratorCache curatorCache = CuratorCache.build(curatorFramework, "/test");
+        CuratorCacheListener curatorCacheListener = CuratorCacheListener.builder()
+                .forInitialized(() -> System.out.println("Initialized")) // 当curatorCache.start()执行完毕的时候，执行此方法
+                .build();
+        curatorCache.listenable().addListener(curatorCacheListener);
+        curatorCache.start();
+        TimeUnit.MINUTES.sleep(10);
+    }
+}
+```
+
+上面的代码就是创建监听节点的核心代码。
+
+> 以前的监听类型是不同的类（过期的类）实现的。现在是通过不同的forXXX方法指定的（例如：`forInitialized`），接下来一一讲解并实战观测结果。
+
+## forInitialized
+
+初始化完成的时候调用，也就是`curatorCache.start()`完成时候。
+
+上面的代码就是例子，运行结果如下：
+
+![image-20230112194847299](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301121948389.png)
+
+
+
+## forCreates
+
+节点创建监听器，监听类型是`CuratorCacheListener.Type.NODE_CREATED`
+
