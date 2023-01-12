@@ -5,10 +5,13 @@ import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
 import org.apache.curator.retry.ExponentialBackoffRetry;
 import org.apache.zookeeper.CreateMode;
-import org.apache.zookeeper.server.EphemeralType;
+import org.apache.zookeeper.ZooDefs;
+import org.apache.zookeeper.data.ACL;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 public class CreateNodeTest {
@@ -84,4 +87,32 @@ public class CreateNodeTest {
         curatorFramework.start();
         curatorFramework.create().withTtl(10000).withMode(CreateMode.PERSISTENT_WITH_TTL).forPath("/ttl1");
     }
+
+    /**
+     * 名称空间
+     * @throws Exception
+     */
+    @Test
+    public void testCreate6() throws Exception {
+        CuratorFramework curatorFramework = CuratorFrameworkFactory.newClient(connectString, retryPolicy);
+        curatorFramework.start();
+        CuratorFramework c2 = curatorFramework.usingNamespace("namespace1");
+        c2.create().forPath("/node1");
+        c2.create().forPath("/node2");
+    }
+
+    /**
+     * 测试acl
+     * @throws Exception
+     */
+    @Test
+    public void testCreate7() throws Exception {
+        CuratorFramework curatorFramework = CuratorFrameworkFactory.newClient(connectString, retryPolicy);
+        curatorFramework.start();
+        List<ACL> aclList = new ArrayList<>();
+        ACL acl = new ACL(ZooDefs.Perms.ALL, ZooDefs.Ids.ANYONE_ID_UNSAFE);
+        aclList.add(acl);
+        curatorFramework.create().withACL(aclList).forPath("/acl1");
+    }
+
 }

@@ -91,7 +91,36 @@ public class ConnectionTest {
 运行完毕后查看结果：
 ![](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301111344287.png)
 
-# 创建节点
+
+
+# **名称空间（Namespace）**
+
+curator中名称空间的含义，就是设置一个公共的父级path，之后的操作全部都是基于该path。
+
+```java
+/**
+ * 名称空间
+ * @throws Exception
+ */
+@Test
+public void testCreate6() throws Exception {
+    CuratorFramework curatorFramework = CuratorFrameworkFactory.newClient(connectString, retryPolicy);
+    curatorFramework.start();
+    CuratorFramework c2 = curatorFramework.usingNamespace("namespace1");
+    c2.create().forPath("/node1");
+    c2.create().forPath("/node2");
+}
+```
+
+查看运行结果：
+![](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301121316314.png)
+
+
+
+# CRUD基础
+
+## 创建
+
 创建节点使用`create`方法，该方法返回一个`CreateBuilder`他是一个建造者模式的类。用于创建节点。
 ```java
 package com.itlab1024.curator.connection;
@@ -137,7 +166,7 @@ public void testCreateDefaultData() throws Exception {
 创建节点时如果节点存在，则会抛出`NodeExistsException`异常
 ![](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301111410229.png)
 
-**使用forPath设置节点的值**
+### **使用forPath设置节点的值**
 
 forPath还接收第二个参数（节点的值，字节数组类型）
 ```java
@@ -152,7 +181,7 @@ public void testCreate2() throws Exception {
 ![](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301111427929.png)
 可见正确设置了值。
 
-**节点模式设置**
+### **节点模式设置**
 
 可以通过`withMode`方法设置节点的类型，未显示指定的节点都是持久性节点。
 
@@ -174,6 +203,209 @@ public void testCreate3() throws Exception {
 ![](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301111512167.png)
 可以看到临时节点，红色框内只有临时节点该属性才是非零。
 
-**TTL时长设置**
+### **TTL时长设置**
 
 使用`withTtl`设置时长，单位毫秒。当模式为 CreateMode.PERSISTENT_WITH_TTL 或CreateMode.PERSISTENT_SEQUENTIAL_WITH_TTL时指定 TTL。必须大于 0 且小于或等于 EphemeralType.MAX_TTL。
+```java
+/**
+ * 测试ttl
+ * @throws Exception
+ */
+@Test
+public void testCreate5() throws Exception {
+    CuratorFramework curatorFramework = CuratorFrameworkFactory.newClient(connectString, retryPolicy);
+    curatorFramework.start();
+    curatorFramework.create().withTtl(10000).withMode(CreateMode.PERSISTENT_WITH_TTL).forPath("/ttl1");
+}
+```
+可能出现如下错误：
+![](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301121306568.png)
+这是因为TTL默认是关闭的，需要打开（zoo.cfg中设置`extendedTypesEnabled=true`）。
+再次运行：
+```shell
+[zk: localhost:2181(CONNECTED) 8] ls /
+[defaultDataTest, hiveserver2_zk, test, test2, ttl1, zookeeper]
+#等待10秒后再次查看，ttl1节点自动被删除。
+[zk: localhost:2181(CONNECTED) 9] ls /
+[defaultDataTest, hiveserver2_zk, test, test2, zookeeper]
+```
+### ACL权限
+
+创建节点时设置ACL，主要通过`withACL`方法设置，接收一个`List<ACL>`类型的参数。
+
+`ACL`实例对象，通过该类的构造方法创建，类似`ACL acl = new ACL(ZooDefs.Perms.ALL, ZooDefs.Ids.ANYONE_ID_UNSAFE);`
+
+```java
+/**
+ * 测试acl
+ * @throws Exception
+ */
+@Test
+public void testCreate7() throws Exception {
+    CuratorFramework curatorFramework = CuratorFrameworkFactory.newClient(connectString, retryPolicy);
+    curatorFramework.start();
+    List<ACL> aclList = new ArrayList<>();
+    ACL acl = new ACL(ZooDefs.Perms.ALL, ZooDefs.Ids.ANYONE_ID_UNSAFE);
+    aclList.add(acl);
+    curatorFramework.create().withACL(aclList).forPath("/acl1");
+}
+```
+
+运行结果：
+
+![image-20230112153655747](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301121536793.png)
+
+运行完毕后，通过命令行查看权限，可以看到已经设置成功。
+
+如果不设置ACL，默认则是`new ACL(Perms.ALL, ANYONE_ID_UNSAFE)`。
+
+## 查询值
+
+查询数据使用`getData`方法。
+
+```java
+/**
+ * 查询节点的值
+ * @throws Exception
+ */
+@Test
+public void testGetData() throws Exception {
+    CuratorFramework curatorFramework = CuratorFrameworkFactory.newClient(connectString, retryPolicy);
+    curatorFramework.start();
+    byte[] bytes = curatorFramework.getData().forPath("/test");
+    System.out.println("/test节点的值是:" + new String(bytes, StandardCharsets.UTF_8));
+}
+```
+
+结果：
+
+![命令行查询](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301121347952.png)
+
+
+
+![api查询结果](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301121347616.png)
+
+## 设置值
+
+使用`setData`，配合`forpath`方法。
+
+```java
+/**
+ * 设置节点的值
+ * @throws Exception
+ */
+@Test
+public void testGetData2() throws Exception {
+    CuratorFramework curatorFramework = CuratorFrameworkFactory.newClient(connectString, retryPolicy);
+    curatorFramework.start();
+    byte[] bytes = curatorFramework.getData().forPath("/test");
+    System.out.println("/test节点的原始值是:" + new String(bytes, StandardCharsets.UTF_8));
+    curatorFramework.setData().forPath("/test", "updated".getBytes(StandardCharsets.UTF_8));
+    bytes = curatorFramework.getData().forPath("/test");
+    System.out.println("/test节点的新值是:" + new String(bytes, StandardCharsets.UTF_8));
+}
+```
+
+运行结果是：
+
+![image-20230112150323445](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301121503512.png)
+
+## 获取孩子节点
+
+```java
+/**
+ * 获取孩子节点
+ * @throws Exception
+ */
+@Test
+public void testGetState() throws Exception {
+    CuratorFramework curatorFramework = CuratorFrameworkFactory.newClient(connectString, retryPolicy);
+    curatorFramework.start();
+    List<String> children = curatorFramework.getChildren().forPath("/namespace1");
+    children.forEach(System.out::println);
+}
+```
+
+运行结果：
+
+![image-20230112152418448](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301121524560.png)
+
+![image-20230112152442481](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301121524557.png)
+
+## 获取ACL
+
+```java
+package com.itlab1024.curator.connection;
+
+import org.apache.curator.RetryPolicy;
+import org.apache.curator.framework.CuratorFramework;
+import org.apache.curator.framework.CuratorFrameworkFactory;
+import org.apache.curator.retry.ExponentialBackoffRetry;
+import org.apache.zookeeper.CreateMode;
+import org.apache.zookeeper.data.ACL;
+import org.junit.jupiter.api.Test;
+
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+
+public class ACLTest {
+    String connectString = "172.30.140.89:2181";
+    RetryPolicy retryPolicy = new ExponentialBackoffRetry(1000, 3);
+
+    /**
+     * 获取Acl列表
+     */
+    @Test
+    public void testAcl1() throws Exception {
+        CuratorFramework curatorFramework = CuratorFrameworkFactory.newClient(connectString, retryPolicy);
+        curatorFramework.start();
+        List<ACL> acls = curatorFramework.getACL().forPath("/test");
+        acls.forEach(acl -> System.out.println(acl.getId() + " " + acl.getPerms()));
+    }
+
+}
+```
+
+运行结果：
+
+![image-20230112153012559](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301121530612.png)
+
+## 删除节点
+
+使用`delete`，搭配`forPath`方法，删除指定的节点。
+
+```java
+package com.itlab1024.curator.connection;
+
+import org.apache.curator.RetryPolicy;
+import org.apache.curator.framework.CuratorFramework;
+import org.apache.curator.framework.CuratorFrameworkFactory;
+import org.apache.curator.retry.ExponentialBackoffRetry;
+import org.junit.jupiter.api.Test;
+
+import java.util.List;
+
+public class DeleteNodeTest {
+    String connectString = "172.30.140.89:2181";
+    RetryPolicy retryPolicy = new ExponentialBackoffRetry(1000, 3);
+
+    /**
+     * 删除节点
+     * @throws Exception
+     */
+    @Test
+    public void testGetState() throws Exception {
+        CuratorFramework curatorFramework = CuratorFrameworkFactory.newClient(connectString, retryPolicy);
+        curatorFramework.start();
+        curatorFramework.delete().forPath("/test");
+    }
+}
+```
+
+程序执行完毕后，通过命令行查询`/test`可知已经被删除。
+
+![image-20230112154133228](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301121541279.png)
+
+如果被删除的节点有孩子节点，则无法删除，抛出`NotEmptyException`。
+
