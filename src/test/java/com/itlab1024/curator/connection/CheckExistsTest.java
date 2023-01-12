@@ -12,7 +12,7 @@ public class CheckExistsTest {
     RetryPolicy retryPolicy = new ExponentialBackoffRetry(1000, 3);
 
     /**
-     * 检查是否存在
+     * 查询客户端状态
      * @throws Exception
      */
     @Test

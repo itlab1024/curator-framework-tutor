@@ -119,7 +119,7 @@ public void testCreate6() throws Exception {
 
 # CRUD基础
 
-## 创建
+## 创建节点
 
 创建节点使用`create`方法，该方法返回一个`CreateBuilder`他是一个建造者模式的类。用于创建节点。
 ```java
@@ -475,7 +475,7 @@ public class GetStateTest {
     RetryPolicy retryPolicy = new ExponentialBackoffRetry(1000, 3);
 
     /**
-     * 获取状态
+     * 查询客户端状态
      * @throws Exception
      */
     @Test
@@ -493,3 +493,86 @@ public class GetStateTest {
 }
 ```
 
+# 事务
+
+
+
+```java
+package com.itlab1024.curator.connection;
+
+import org.apache.curator.RetryPolicy;
+import org.apache.curator.framework.CuratorFramework;
+import org.apache.curator.framework.CuratorFrameworkFactory;
+import org.apache.curator.framework.api.GetConfigBuilder;
+import org.apache.curator.framework.api.transaction.CuratorMultiTransaction;
+import org.apache.curator.framework.api.transaction.CuratorOp;
+import org.apache.curator.framework.api.transaction.CuratorTransaction;
+import org.apache.curator.framework.api.transaction.CuratorTransactionResult;
+import org.apache.curator.retry.ExponentialBackoffRetry;
+import org.apache.zookeeper.data.Stat;
+import org.apache.zookeeper.server.quorum.flexible.QuorumVerifier;
+import org.junit.jupiter.api.Test;
+
+import java.nio.charset.StandardCharsets;
+import java.util.Collection;
+import java.util.List;
+
+public class TransactionTest{
+    String connectString = "172.30.140.89:2181";
+    RetryPolicy retryPolicy = new ExponentialBackoffRetry(1000, 3);
+
+    /**
+     * 查询客户端状态
+     * @throws Exception
+     */
+    @Test
+    public void testTransaction() throws Exception {
+        CuratorFramework curatorFramework = CuratorFrameworkFactory.newClient(connectString, retryPolicy);
+        curatorFramework.start();
+        CuratorOp createOp = curatorFramework.transactionOp().create().forPath("/transaction1");
+        CuratorOp setDataOp = curatorFramework.transactionOp().setData().forPath("/transaction2", "transaction2".getBytes(StandardCharsets.UTF_8));
+        CuratorOp deleteOp = curatorFramework.transactionOp().delete().forPath("/transaction3");
+
+        List<CuratorTransactionResult> result = curatorFramework.transaction().forOperations(createOp, setDataOp, deleteOp);
+        result.forEach(rt -> System.out.println(rt.getForPath() + "---" + rt.getType()));
+    }
+}
+```
+
+运行程序前先看下zk节点情况
+
+![image-20230112175631300](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301121756369.png)
+
+可以看到没有`transaction1`和`transaction2`和`transaction3`。
+
+运行程序会出现如下异常。
+
+![image-20230112175722403](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301121757512.png)
+
+
+
+出现异常则事务应该回滚，也就是说`transaction1`节点不应该创建成功。
+
+![image-20230112175815921](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301121758968.png)
+
+通过上图可知确实没有创建成功。
+
+接下来我通过命令长创建`/transaction2`和`/transaction3`这两个节点。
+
+![image-20230112180734954](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301121807011.png)
+
+创建完毕，并且可以看到`/transaction2`节点的值是`null`。
+
+重新运行程序后，不会发生异常。
+
+
+
+![image-20230112180839996](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301121808093.png)
+
+
+
+通过命令行看下事务是否完全执行成功。
+
+![image-20230112180946262](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301121809319.png)
+
+可以看到`/transaction1`节点创建成功，`/transaction2`节点的值修改成功。`/transaction3`节点被删除。说明事务是有效的！
