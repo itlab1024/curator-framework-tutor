@@ -426,6 +426,16 @@ public void testDelete2() throws Exception {
 }
 ```
 
+运行后，查看该节点
+
+
+
+![image-20230112182019037](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301121820090.png)
+
+
+
+节点已经被删除。并且级联删除了子节点。
+
 
 
 ## 检查节点是否存在
