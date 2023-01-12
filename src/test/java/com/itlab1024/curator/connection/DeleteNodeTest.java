@@ -17,9 +17,20 @@ public class DeleteNodeTest {
      * @throws Exception
      */
     @Test
-    public void testGetState() throws Exception {
+    public void testDelete1() throws Exception {
         CuratorFramework curatorFramework = CuratorFrameworkFactory.newClient(connectString, retryPolicy);
         curatorFramework.start();
         curatorFramework.delete().forPath("/namespace1");
+    }
+
+    /**
+     * 删除节点（包含子节点）
+     * @throws Exception
+     */
+    @Test
+    public void testDelete2() throws Exception {
+        CuratorFramework curatorFramework = CuratorFrameworkFactory.newClient(connectString, retryPolicy);
+        curatorFramework.start();
+        curatorFramework.delete().deletingChildrenIfNeeded().forPath("/namespace1");
     }
 }

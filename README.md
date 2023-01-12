@@ -395,7 +395,7 @@ public class DeleteNodeTest {
      * @throws Exception
      */
     @Test
-    public void testGetState() throws Exception {
+    public void testDelete1() throws Exception {
         CuratorFramework curatorFramework = CuratorFrameworkFactory.newClient(connectString, retryPolicy);
         curatorFramework.start();
         curatorFramework.delete().forPath("/test");
@@ -408,6 +408,25 @@ public class DeleteNodeTest {
 ![image-20230112154133228](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301121541279.png)
 
 如果被删除的节点有孩子节点，则无法删除，抛出`NotEmptyException`。
+
+
+
+**那么如何删除包含子节点的节点呢？需要使用`deletingChildrenIfNeeded`方法**
+
+```java
+/**
+ * 删除节点（包含子节点）
+ * @throws Exception
+ */
+@Test
+public void testDelete2() throws Exception {
+    CuratorFramework curatorFramework = CuratorFrameworkFactory.newClient(connectString, retryPolicy);
+    curatorFramework.start();
+    curatorFramework.delete().deletingChildrenIfNeeded().forPath("/namespace1");
+}
+```
+
+
 
 ## 检查节点是否存在
 
