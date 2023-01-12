@@ -3,31 +3,23 @@ package com.itlab1024.curator.connection;
 import org.apache.curator.RetryPolicy;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
-import org.apache.curator.framework.imps.CuratorFrameworkState;
 import org.apache.curator.retry.ExponentialBackoffRetry;
+import org.apache.zookeeper.data.Stat;
 import org.junit.jupiter.api.Test;
 
-import java.util.List;
-import java.util.concurrent.TimeUnit;
-
-public class GetStateTest {
+public class CheckExistsTest {
     String connectString = "172.30.140.89:2181";
     RetryPolicy retryPolicy = new ExponentialBackoffRetry(1000, 3);
 
     /**
-     * 获取状态
+     * 检查是否存在
      * @throws Exception
      */
     @Test
     public void testGetState() throws Exception {
         CuratorFramework curatorFramework = CuratorFrameworkFactory.newClient(connectString, retryPolicy);
-        CuratorFrameworkState state = curatorFramework.getState();
-        System.out.println("状态是" + state); // 状态是LATENT
         curatorFramework.start();
-        state = curatorFramework.getState();
-        System.out.println("状态是" + state); // 状态是STARTED
-        curatorFramework.close();
-        state = curatorFramework.getState();
-        System.out.println("状态是" + state); // 状态是STOPPED
+        Stat stat = curatorFramework.checkExists().forPath("/namespace1");
+        System.out.println(stat);
     }
 }

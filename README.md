@@ -183,7 +183,7 @@ public void testCreate2() throws Exception {
 
 ### **节点模式设置**
 
-可以通过`withMode`方法设置节点的类型，未显示指定的节点都是持久性节点。
+可以通过`withMode`方法设置节点的类型，为显示指定的节点都是持久性节点。
 
 ```java
 /**
@@ -408,4 +408,88 @@ public class DeleteNodeTest {
 ![image-20230112154133228](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301121541279.png)
 
 如果被删除的节点有孩子节点，则无法删除，抛出`NotEmptyException`。
+
+## 检查节点是否存在
+
+使用`checkExists()`搭配`forPath`来实现，返回一个`Stat`对象信息。
+
+```
+package com.itlab1024.curator.connection;
+
+import org.apache.curator.RetryPolicy;
+import org.apache.curator.framework.CuratorFramework;
+import org.apache.curator.framework.CuratorFrameworkFactory;
+import org.apache.curator.retry.ExponentialBackoffRetry;
+import org.apache.zookeeper.data.Stat;
+import org.junit.jupiter.api.Test;
+
+public class CheckExistsTest {
+    String connectString = "172.30.140.89:2181";
+    RetryPolicy retryPolicy = new ExponentialBackoffRetry(1000, 3);
+
+    /**
+     * 检查是否存在
+     * @throws Exception
+     */
+    @Test
+    public void testGetState() throws Exception {
+        CuratorFramework curatorFramework = CuratorFrameworkFactory.newClient(connectString, retryPolicy);
+        curatorFramework.start();
+        Stat stat = curatorFramework.checkExists().forPath("/namespace1");
+        System.out.println(stat);
+    }
+}
+```
+
+运行结果：
+
+![image-20230112173212601](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301121732695.png)
+
+
+
+`stat`的具体信息如下：
+
+
+
+![image-20230112173310084](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301121733222.png)
+
+## 查看会话状态
+
+使用`getState()`。
+
+```java
+package com.itlab1024.curator.connection;
+
+import org.apache.curator.RetryPolicy;
+import org.apache.curator.framework.CuratorFramework;
+import org.apache.curator.framework.CuratorFrameworkFactory;
+import org.apache.curator.framework.imps.CuratorFrameworkState;
+import org.apache.curator.retry.ExponentialBackoffRetry;
+import org.junit.jupiter.api.Test;
+
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+
+public class GetStateTest {
+    String connectString = "172.30.140.89:2181";
+    RetryPolicy retryPolicy = new ExponentialBackoffRetry(1000, 3);
+
+    /**
+     * 获取状态
+     * @throws Exception
+     */
+    @Test
+    public void testGetState() throws Exception {
+        CuratorFramework curatorFramework = CuratorFrameworkFactory.newClient(connectString, retryPolicy);
+        CuratorFrameworkState state = curatorFramework.getState();
+        System.out.println("状态是" + state); // 状态是LATENT
+        curatorFramework.start();
+        state = curatorFramework.getState();
+        System.out.println("状态是" + state); // 状态是STARTED
+        curatorFramework.close();
+        state = curatorFramework.getState();
+        System.out.println("状态是" + state); // 状态是STOPPED
+    }
+}
+```
 
