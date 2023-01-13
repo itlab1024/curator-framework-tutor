@@ -1,4 +1,4 @@
-package com.itlab1024.curator.connection;
+package com.itlab1024.curator;
 
 import org.apache.curator.RetryPolicy;
 import org.apache.curator.framework.CuratorFramework;
@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 public class DeleteNodeTest {
-    String connectString = "172.30.140.89:2181";
+    String connectString = "172.20.98.4:2181";
     RetryPolicy retryPolicy = new ExponentialBackoffRetry(1000, 3);
 
     /**

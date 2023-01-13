@@ -682,3 +682,28 @@ public class CacheTest {
 
 节点创建监听器，监听类型是`CuratorCacheListener.Type.NODE_CREATED`
 
+当监听的节点创建的时候触发回调
+
+```java
+/**
+ * forCreates监听 CuratorCacheListener.Type.NODE_CREATED
+ * @throws Exception
+ */
+@Test
+public void testCache2() throws Exception {
+    CuratorFramework curatorFramework = CuratorFrameworkFactory.newClient(connectString, retryPolicy);
+    curatorFramework.start();
+
+    CuratorCache curatorCache = CuratorCache.build(curatorFramework, "/test");
+    CuratorCacheListener curatorCacheListener = CuratorCacheListener.builder()
+        .forCreates(childData -> {
+            log.debug("forCreates回调执行, path=[{}], data=[{}], stat=[{}]", childData.getPath()
+                      , Objects.isNull(childData.getData()) ? null : new String(childData.getData(), StandardCharsets.UTF_8), childData.getStat());
+        })
+        .build();
+    curatorCache.listenable().addListener(curatorCacheListener);
+    curatorCache.start();
+    TimeUnit.MINUTES.sleep(10);
+}
+```
+
