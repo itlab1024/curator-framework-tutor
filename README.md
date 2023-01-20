@@ -625,41 +625,98 @@ public class TransactionTest{
 
 本版本中`PathChildrenCache`、`PathChildrenCacheMod`、`TreeCache`都已经是过期的了，官方推荐使用`CuratorCache`。
 
-```java
-package com.itlab1024.curator.connection;
+并且api风格也更改了，改为了流式风格。
 
+`CuratorCacheListener`提供了多种监听器，比如`forInitialized`，`forCreates`等。
+
+```java
+package com.itlab1024.curator;
+
+import lombok.extern.slf4j.Slf4j;
 import org.apache.curator.RetryPolicy;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
-import org.apache.curator.framework.api.CuratorEvent;
-import org.apache.curator.framework.api.CuratorListener;
-import org.apache.curator.framework.recipes.cache.*;
+import org.apache.curator.framework.listen.Listenable;
+import org.apache.curator.framework.recipes.cache.CuratorCache;
+import org.apache.curator.framework.recipes.cache.CuratorCacheListener;
 import org.apache.curator.retry.ExponentialBackoffRetry;
-import org.apache.zookeeper.data.Stat;
 import org.junit.jupiter.api.Test;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
+@Slf4j
 public class CacheTest {
-    String connectString = "172.30.140.89:2181";
+    String connectString = "localhost:2181";
     RetryPolicy retryPolicy = new ExponentialBackoffRetry(1000, 3);
 
+
     /**
-     * 监听（初始化）
+   CuratorCacheListener.Type.NODE_CREATED
+     *
      * @throws Exception
      */
     @Test
     public void testCache1() throws Exception {
         CuratorFramework curatorFramework = CuratorFrameworkFactory.newClient(connectString, retryPolicy);
         curatorFramework.start();
-
-        CuratorCache curatorCache = CuratorCache.build(curatorFramework, "/test");
+        CuratorCache curatorCache = CuratorCache.builder(curatorFramework, "/ns1").build();
         CuratorCacheListener curatorCacheListener = CuratorCacheListener.builder()
-                .forInitialized(() -> System.out.println("Initialized")) // 当curatorCache.start()执行完毕的时候，执行此方法
+                .forInitialized(() -> {
+                    log.info("forInitialized回调");
+                    log.info("--------");
+                })
+
+                .forCreates(childData -> {
+                    log.info("forCreates回调执行, path=[{}], data=[{}], stat=[{}]", childData.getPath(), Objects.isNull(childData.getData()) ? null : new String(childData.getData(), StandardCharsets.UTF_8), childData.getStat());
+                    log.info("--------");
+                })
+
+                .forNodeCache(() -> {
+                    log.info("forNodeCache回调");
+                    log.info("--------");
+                })
+
+                .forChanges((oldNode, node) -> {
+                    log.info("forChanges回调, oldNode.path=[{}], oldNode.data=[{}], oldNode.stat=[{}], node.path=[{}], node.data=[{}], node.stat=[{}]", oldNode.getPath(), Objects.isNull(oldNode.getData()) ? null : new String(oldNode.getData(), StandardCharsets.UTF_8), oldNode.getStat(), node.getPath(), Objects.isNull(node.getData()) ? null : new String(node.getData(), StandardCharsets.UTF_8), node.getStat());
+                    log.info("--------");
+                })
+
+                .forDeletes(childData -> {
+                    log.info("forDeletes回调执行, path=[{}], data=[{}], stat=[{}]", childData.getPath(), Objects.isNull(childData.getData()) ? null : new String(childData.getData(), StandardCharsets.UTF_8), childData.getStat());
+                    log.info("--------");
+                })
+
+                .forAll((type, oldNode, node) -> {
+                    log.info("forAll回调");
+                    log.info("type=[{}]", type);
+                    if (Objects.nonNull(oldNode)) {
+                        log.info("oldNode.path=[{}], oldNode.data=[{}], oldNode.stat=[{}]", oldNode.getPath(), Objects.isNull(oldNode.getData()) ? null : new String(oldNode.getData(), StandardCharsets.UTF_8), oldNode.getStat());
+                    }
+                    if (Objects.nonNull(node)) {
+                        log.info("node.path=[{}], node.data=[{}], node.stat=[{}]", node.getPath(), Objects.isNull(node.getData()) ? null : new String(node.getData(), StandardCharsets.UTF_8), node.getStat());
+                    }
+                    log.info("--------");
+                })
+
+                .forCreatesAndChanges((oldNode, node) -> {
+                    log.info("forCreatesAndChanges回调");
+                    if (Objects.nonNull(oldNode)) {
+                        log.info("oldNode.path=[{}], oldNode.data=[{}], oldNode.stat=[{}]", oldNode.getPath(), Objects.isNull(oldNode.getData()) ? null : new String(oldNode.getData(), StandardCharsets.UTF_8), oldNode.getStat());
+                    }
+                    if (Objects.nonNull(node)) {
+                        log.info("node.path=[{}], node.data=[{}], node.stat=[{}]", node.getPath(), Objects.isNull(node.getData()) ? null : new String(node.getData(), StandardCharsets.UTF_8), node.getStat());
+                    }
+                    log.info("--------");
+                })
                 .build();
-        curatorCache.listenable().addListener(curatorCacheListener);
+        Listenable<CuratorCacheListener> listenable = curatorCache.listenable();
+        listenable.addListener(curatorCacheListener);
         curatorCache.start();
+        
         TimeUnit.MINUTES.sleep(10);
+        curatorCache.close();
     }
 }
 ```
@@ -668,42 +725,142 @@ public class CacheTest {
 
 > 以前的监听类型是不同的类（过期的类）实现的。现在是通过不同的forXXX方法指定的（例如：`forInitialized`），接下来一一讲解并实战观测结果。
 
-## forInitialized
+**在测试前我将zk中的数据清理掉**
 
-初始化完成的时候调用，也就是`curatorCache.start()`完成时候。
-
-上面的代码就是例子，运行结果如下：
-
-![image-20230112194847299](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301121948389.png)
-
-
-
-## forCreates
-
-节点创建监听器，监听类型是`CuratorCacheListener.Type.NODE_CREATED`
-
-当监听的节点创建的时候触发回调
-
-```java
-/**
- * forCreates监听 CuratorCacheListener.Type.NODE_CREATED
- * @throws Exception
- */
-@Test
-public void testCache2() throws Exception {
-    CuratorFramework curatorFramework = CuratorFrameworkFactory.newClient(connectString, retryPolicy);
-    curatorFramework.start();
-
-    CuratorCache curatorCache = CuratorCache.build(curatorFramework, "/test");
-    CuratorCacheListener curatorCacheListener = CuratorCacheListener.builder()
-        .forCreates(childData -> {
-            log.debug("forCreates回调执行, path=[{}], data=[{}], stat=[{}]", childData.getPath()
-                      , Objects.isNull(childData.getData()) ? null : new String(childData.getData(), StandardCharsets.UTF_8), childData.getStat());
-        })
-        .build();
-    curatorCache.listenable().addListener(curatorCacheListener);
-    curatorCache.start();
-    TimeUnit.MINUTES.sleep(10);
-}
+```shell
+[zk: localhost:2181(CONNECTED) 5] ls /
+[zookeeper]
 ```
+
+可以看到完全清理掉了。
+
+## 测试
+
+### 启动
+
+运行上面的示例，会打印如下内容：
+
+![image-20230120132327826](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301201323978.png)
+
+可见初始化回调被调用。
+
+### 创建节点
+
+创建CuratorCache监听的节点`/ns1`，需要注意的是此时节点并不存在。
+
+命令行操作如下：
+
+![image-20230120133059820](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301201330851.png)
+
+程序输出如下：
+
+![image-20230120133040206](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301201330288.png)
+
+我们看到当创建节点的时候有四个回调函数被执行。
+
+**结论：**当创建节点的时候`forCreates`、`forNodeCache`、`forAll`、`forCreatesAndChanges`被回调。
+
+那么如果再创建子节点情况会是什么样的呢？比如我创建`/ns1/sub1`。
+
+命令行：
+
+![image-20230120134553410](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301201345465.png)
+
+
+
+控制台：
+
+![image-20230120134534658](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301201345707.png)
+
+
+
+节点创建监听器，监听类型是`CuratorCacheListener.Type.NODE_CREATED`，创建节点的时候会处罚，当创建子节点的时候也会处罚。
+
+**结论：**创建子节点依然会回调上述所说的四个监听器。
+
+### 修改数据
+
+修改监听的根节点`/ns1`的值
+
+命令行修改值：
+
+![image-20230120185406734](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301201854761.png)
+
+控制台输出：
+
+![image-20230120185350193](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301201853255.png)
+
+当修改监听根节点`/ns1`的值的时候，`forNodeCache`、`forChanges`、`forAll`、`forCreatesAndChanges`四个监听器被触发。
+
+接下来再修改其子节点的值
+
+![image-20230120185605378](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301201856407.png)
+
+控制台输出如下：
+
+![image-20230120185639458](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301201856556.png)
+
+依然回调`forNodeCache`、`forChanges`、`forAll`、`forCreatesAndChanges`四个监听器函数。
+
+**结论：**修改监听节点以及其子节点都会触发`forNodeCache`、`forChanges`、`forAll`、`forCreatesAndChanges`监听器。
+
+### ACL设置
+
+命令行：
+
+![image-20230120190131911](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301201901941.png)
+
+控制台没有打印回调：
+
+![image-20230120190152818](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301201901883.png)
+
+**结论：**设置ACL不会触发监听器。
+
+### 删除节点
+
+首先我先删除监听节点`/ns1`下的子节点
+
+命令行：
+
+![image-20230120193659179](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301201936209.png)
+
+控制台：
+
+![image-20230120193726177](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301201937259.png)
+
+删除子节点的时候会触发`forDeletes`、`forNodeCache`、`forAll`执行。
+
+接下来再删除监听根节点`/ns1`。
+
+命令行：
+
+![image-20230120193904291](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301201939345.png)
+
+控制台输出：
+
+![image-20230120193920933](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301201939966.png)
+
+跟上面子节点的删除触发的监听器回调一样！
+
+**总结：**删除监听根节点以及其子节点会触发`forDeletes`、`forNodeCache`、`forAll`监听器。
+
+那么如果我删除的是一个父级节点呢？会出现什么情况？
+
+**因为我之前的实验，删除了`/ns1/sub1`所以重建，重建后使用`deleteall /ns1`**
+
+命令行：
+
+![image-20230120200205459](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301202002490.png)
+
+
+
+控制台：
+
+![image-20230120200154415](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301202001470.png)
+
+
+
+可以看到，级联删除，会多次触发`forDeletes`，根节点和其子节点的删除都会触发。同理`forAll`和`forNodeCache`也会多次触发。
+
+**总结：**对于节点的删除，无论是单个删除还是级联删除，每个节点的删除都会触发`forDeletes`、`forAll`和`forNodeCache`监听器。
 

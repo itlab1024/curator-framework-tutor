@@ -16,11 +16,11 @@ import java.util.concurrent.TimeUnit;
 
 @Slf4j
 public class CacheTest {
-    String connectString = "172.20.98.4:2181";
+    String connectString = "localhost:2181";
     RetryPolicy retryPolicy = new ExponentialBackoffRetry(1000, 3);
 
+
     /**
-     * 监听（初始化）
      *
      * @throws Exception
      */
@@ -28,94 +28,64 @@ public class CacheTest {
     public void testCache1() throws Exception {
         CuratorFramework curatorFramework = CuratorFrameworkFactory.newClient(connectString, retryPolicy);
         curatorFramework.start();
-
-        CuratorCache curatorCache = CuratorCache.build(curatorFramework, "/test");
-        CuratorCacheListener curatorCacheListener = CuratorCacheListener.builder().forInitialized(() -> System.out.println("Initialized")) // 当curatorCache.start()执行完毕的时候，执行此方法
-                .build();
-        curatorCache.listenable().addListener(curatorCacheListener);
-        curatorCache.start();
-        TimeUnit.MINUTES.sleep(10);
-    }
-
-    /**
-     * forCreates监听 CuratorCacheListener.Type.NODE_CREATED
-     *
-     * @throws Exception
-     */
-    @Test
-    public void testCache2() throws Exception {
-        CuratorFramework curatorFramework = CuratorFrameworkFactory.newClient(connectString, retryPolicy);
-        curatorFramework.start();
-        CuratorCache curatorCache = CuratorCache.build(curatorFramework, "/ns1", CuratorCache.Options.SINGLE_NODE_CACHE);
+        CuratorCache curatorCache = CuratorCache.builder(curatorFramework, "/ns1").build();
         CuratorCacheListener curatorCacheListener = CuratorCacheListener.builder()
                 .forInitialized(() -> {
                     log.info("forInitialized回调");
-                    log.debug("--------");
+                    log.info("--------");
                 })
 
                 .forCreates(childData -> {
-                    log.debug("forCreates回调执行, path=[{}], data=[{}], stat=[{}]", childData.getPath(), Objects.isNull(childData.getData()) ? null : new String(childData.getData(), StandardCharsets.UTF_8), childData.getStat());
-                    log.debug("--------");
+                    log.info("forCreates回调执行, path=[{}], data=[{}], stat=[{}]", childData.getPath(), Objects.isNull(childData.getData()) ? null : new String(childData.getData(), StandardCharsets.UTF_8), childData.getStat());
+                    log.info("--------");
                 })
 
                 .forNodeCache(() -> {
-                    log.debug("forNodeCache回调");
-                    log.debug("--------");
+                    log.info("forNodeCache回调");
+                    log.info("--------");
                 })
 
                 .forChanges((oldNode, node) -> {
-                    log.debug("forChanges回调, oldNode.path=[{}], oldNode.data=[{}], oldNode.stat=[{}], node.path=[{}], node.data=[{}], node.stat=[{}]", oldNode.getPath(), Objects.isNull(oldNode.getData()) ? null : new String(oldNode.getData(), StandardCharsets.UTF_8), oldNode.getStat(), node.getPath(), Objects.isNull(node.getData()) ? null : new String(node.getData(), StandardCharsets.UTF_8), node.getStat());
-                    log.debug("--------");
+                    log.info("forChanges回调, oldNode.path=[{}], oldNode.data=[{}], oldNode.stat=[{}], node.path=[{}], node.data=[{}], node.stat=[{}]", oldNode.getPath(), Objects.isNull(oldNode.getData()) ? null : new String(oldNode.getData(), StandardCharsets.UTF_8), oldNode.getStat(), node.getPath(), Objects.isNull(node.getData()) ? null : new String(node.getData(), StandardCharsets.UTF_8), node.getStat());
+                    log.info("--------");
                 })
 
                 .forDeletes(childData -> {
-                    log.debug("forDeletes回调执行, path=[{}], data=[{}], stat=[{}]", childData.getPath(), Objects.isNull(childData.getData()) ? null : new String(childData.getData(), StandardCharsets.UTF_8), childData.getStat());
-                    log.debug("--------");
+                    log.info("forDeletes回调执行, path=[{}], data=[{}], stat=[{}]", childData.getPath(), Objects.isNull(childData.getData()) ? null : new String(childData.getData(), StandardCharsets.UTF_8), childData.getStat());
+                    log.info("--------");
                 })
 
                 .forAll((type, oldNode, node) -> {
-                    log.debug("forAll回调");
-                    log.debug("type=[{}]", type);
+                    log.info("forAll回调");
+                    log.info("type=[{}]", type);
                     if (Objects.nonNull(oldNode)) {
-                        log.debug("oldNode.path=[{}], oldNode.data=[{}], oldNode.stat=[{}]", oldNode.getPath(), Objects.isNull(oldNode.getData()) ? null : new String(oldNode.getData(), StandardCharsets.UTF_8), oldNode.getStat());
+                        log.info("oldNode.path=[{}], oldNode.data=[{}], oldNode.stat=[{}]", oldNode.getPath(), Objects.isNull(oldNode.getData()) ? null : new String(oldNode.getData(), StandardCharsets.UTF_8), oldNode.getStat());
                     }
                     if (Objects.nonNull(node)) {
-                        log.debug("node.path=[{}], node.data=[{}], node.stat=[{}]", node.getPath(), Objects.isNull(node.getData()) ? null : new String(node.getData(), StandardCharsets.UTF_8), node.getStat());
+                        log.info("node.path=[{}], node.data=[{}], node.stat=[{}]", node.getPath(), Objects.isNull(node.getData()) ? null : new String(node.getData(), StandardCharsets.UTF_8), node.getStat());
                     }
-                    log.debug("--------");
+                    log.info("--------");
                 })
 
                 .forCreatesAndChanges((oldNode, node) -> {
+                    log.info("forCreatesAndChanges回调");
                     if (Objects.nonNull(oldNode)) {
-                        log.debug("oldNode.path=[{}], oldNode.data=[{}], oldNode.stat=[{}]", oldNode.getPath(), Objects.isNull(oldNode.getData()) ? null : new String(oldNode.getData(), StandardCharsets.UTF_8), oldNode.getStat());
+                        log.info("oldNode.path=[{}], oldNode.data=[{}], oldNode.stat=[{}]", oldNode.getPath(), Objects.isNull(oldNode.getData()) ? null : new String(oldNode.getData(), StandardCharsets.UTF_8), oldNode.getStat());
                     }
                     if (Objects.nonNull(node)) {
-                        log.debug("node.path=[{}], node.data=[{}], node.stat=[{}]", node.getPath(), Objects.isNull(node.getData()) ? null : new String(node.getData(), StandardCharsets.UTF_8), node.getStat());
+                        log.info("node.path=[{}], node.data=[{}], node.stat=[{}]", node.getPath(), Objects.isNull(node.getData()) ? null : new String(node.getData(), StandardCharsets.UTF_8), node.getStat());
                     }
-                    log.debug("--------");
+                    log.info("--------");
                 })
                 .build();
-
-        CuratorCacheListener c1 = CuratorCacheListener.builder().forTreeCache(curatorFramework, (client, event) -> {
-            log.debug("forTreeCache回调, type=[{}], data=[{}]", event.getType(), event.getData());
-            log.debug("--------");
-        }).build();
-
-        CuratorCacheListener c2 = CuratorCacheListener.builder().forPathChildrenCache("/test", curatorFramework, (client, event) -> {
-            log.debug("forPathChildrenCache回调, type=[{}], data=[{}], initialData=[{}]", event.getType(), event.getData(), event.getInitialData());
-            log.debug("--------");
-        }).build();
-
+        // 获取监听器列表容器
         Listenable<CuratorCacheListener> listenable = curatorCache.listenable();
+        // 将监听器放入容器中
         listenable.addListener(curatorCacheListener);
-        listenable.addListener(c1);
-        listenable.addListener(c2);
+        // curatorCache必须启动
         curatorCache.start();
-
-        // api操作
-        curatorFramework.create().creatingParentsIfNeeded().forPath("/ns1");
-        curatorFramework.create().creatingParentsIfNeeded().forPath("/ns1/sub1");
-        TimeUnit.MINUTES.sleep(10);
+        // 延时，以保证连接不关闭
+        TimeUnit.DAYS.sleep(10);
         curatorCache.close();
     }
 }
