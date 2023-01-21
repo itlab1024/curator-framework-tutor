@@ -15,4 +15,15 @@ public class ConnectionTest {
         curatorFramework.start();
         curatorFramework.create().forPath("/test");
     }
+
+    @Test
+    public void TestConnection2() throws Exception {
+        CuratorFramework curatorFramework = CuratorFrameworkFactory.builder().connectString("172.20.98.4:2181")
+                .retryPolicy(new ExponentialBackoffRetry(1000,3))
+                .sessionTimeoutMs(1000)
+                .connectionTimeoutMs(10000)
+                .build();
+        curatorFramework.start();
+        curatorFramework.create().forPath("/test");
+    }
 }

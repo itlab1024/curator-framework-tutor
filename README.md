@@ -98,6 +98,95 @@ public class ConnectionTest {
 
 
 
+也可以使用其`builder()`建造者模式构建client。
+
+```java
+@Test
+public void TestConnection2() throws Exception {
+    CuratorFramework curatorFramework = CuratorFrameworkFactory.builder().connectString("172.20.98.4:2181")
+        .retryPolicy(new ExponentialBackoffRetry(1000,3))
+        .sessionTimeoutMs(1000)
+        .connectionTimeoutMs(10000)
+        .build();
+    curatorFramework.start();
+    curatorFramework.create().forPath("/test");
+}
+```
+
+
+
+# 重试策略
+
+重试策略有几种实现，可以通过如下类图直观地展示出来。
+
+![image-20230121185013815](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301211850924.png)
+
+## RetryForever
+
+该策略是永远尝试。
+
+`new RetryForever(2000)`参数是毫秒，代表间隔多久进行重试！
+
+```java
+package com.itlab1024.curator;
+
+import org.apache.curator.framework.CuratorFramework;
+import org.apache.curator.framework.CuratorFrameworkFactory;
+import org.apache.curator.retry.RetryForever;
+import org.junit.jupiter.api.Test;
+
+public class RetryTest {
+    /**
+     * RetryForever
+     */
+    @Test
+    public void testRetryForever() throws Exception {
+        CuratorFramework curatorFramework = CuratorFrameworkFactory.newClient("unknownHost:2181",  new RetryForever(2000));
+        curatorFramework.start();
+    }
+}
+```
+
+## SessionFailedRetryPolicy
+
+session超时重试策略，其构造方法是`SessionFailedRetryPolicy(RetryPolicy delegatePolicy)`，参数就是也是一个重试策略，其含义就是说会话超时的时候使用哪种具体的重试策略。
+
+```java
+
+```
+
+
+
+## RetryNTimes
+
+重试N次策略：`public RetryNTimes(int n, int sleepMsBetweenRetries)`，第一个是重试次数，第二个参数是每次重试间隔多少毫秒。
+
+```java
+@Test
+public void testRetryNTimes() throws Exception {
+    CuratorFramework curatorFramework = CuratorFrameworkFactory.newClient("unknownHost:2181", new RetryNTimes(5, 1000));
+    curatorFramework.start();
+    TimeUnit.DAYS.sleep(1);
+}
+```
+
+上面的代码就是重试5次，重试间隔1000毫秒。
+
+## RetryOneTime
+
+重试一次，他是RetryNTime的特例，N=1的情况。
+
+```java
+@Test
+public void testRetryOneTime() throws Exception {
+    CuratorFramework curatorFramework = CuratorFrameworkFactory.newClient("unknownHost:2181", new RetryOneTime(1000));
+    curatorFramework.start();
+    TimeUnit.DAYS.sleep(1);
+}
+```
+
+
+
 # **名称空间（Namespace）**
 
 curator中名称空间的含义，就是设置一个公共的父级path，之后的操作全部都是基于该path。
@@ -653,7 +742,6 @@ public class CacheTest {
 
 
     /**
-   CuratorCacheListener.Type.NODE_CREATED
      *
      * @throws Exception
      */
@@ -711,11 +799,14 @@ public class CacheTest {
                     log.info("--------");
                 })
                 .build();
+        // 获取监听器列表容器
         Listenable<CuratorCacheListener> listenable = curatorCache.listenable();
+        // 将监听器放入容器中
         listenable.addListener(curatorCacheListener);
+        // curatorCache必须启动
         curatorCache.start();
-        
-        TimeUnit.MINUTES.sleep(10);
+        // 延时，以保证连接不关闭
+        TimeUnit.DAYS.sleep(10);
         curatorCache.close();
     }
 }
@@ -734,7 +825,37 @@ public class CacheTest {
 
 可以看到完全清理掉了。
 
-## 测试
+## API说明
+
+在测试之前要简单地说明下API的基本使用方式。curator监听主要有如下几个主要的类。
+
+* `CuratorFrameworkFactory`这是简单的静态工厂类，用于创建连接zk的客户端（client），里面提供了`newClient`的多态方法，也可以使用`builder`建造者模式类创建客户端。
+
+  ```java
+  String connectString = "localhost:2181";
+  RetryPolicy retryPolicy = new ExponentialBackoffRetry(1000, 3);
+  // 使用newClient方法
+  CuratorFramework curatorFramework = CuratorFrameworkFactory.newClient(connectString, retryPolicy);
+  // 也可以使用静态builder()方法
+  CuratorFramework curatorFramework2 = CuratorFrameworkFactory.builder().connectString(connectString).retryPolicy(retryPolicy).build();
+  ```
+
+* `CuratorCache`类，该类也有提供builder方法
+
+  ```java
+  CuratorCache curatorCache = CuratorCache.builder(curatorFramework, "/ns1").build();
+  ```
+
+  也提供了build方法，可以像下面这样使用。
+
+  ```java
+  CuratorCache curatorCache = CuratorCache.builder(curatorFramework, "/ns1").build();
+          curatorCache= CuratorCache.build(curatorFramework, "/ns1", CuratorCache.Options.SINGLE_NODE_CACHE, CuratorCache.Options.COMPRESSED_DATA, CuratorCache.Options.DO_NOT_CLEAR_ON_CLOSE);
+  ```
+
+  
+
+* `CuratorCacheListener`监听器类，里面可以定义各种监听器。
 
 ### 启动
 
@@ -754,11 +875,11 @@ public class CacheTest {
 
 程序输出如下：
 
-![image-20230120133040206](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301201330288.png)
+![image-20230120203053122](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301202030171.png)
 
 我们看到当创建节点的时候有四个回调函数被执行。
 
-**结论：**当创建节点的时候`forCreates`、`forNodeCache`、`forAll`、`forCreatesAndChanges`被回调。
+**结论：**当创建节点的时候`forCreates`、`forAll`、`forCreatesAndChanges`被回调。
 
 那么如果再创建子节点情况会是什么样的呢？比如我创建`/ns1/sub1`。
 
@@ -770,11 +891,11 @@ public class CacheTest {
 
 控制台：
 
-![image-20230120134534658](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301201345707.png)
+![image-20230120203145032](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301202031086.png)
 
 
 
-节点创建监听器，监听类型是`CuratorCacheListener.Type.NODE_CREATED`，创建节点的时候会处罚，当创建子节点的时候也会处罚。
+节点创建监听器，监听类型是`CuratorCacheListener.Type.NODE_CREATED`，创建节点的时候会触发，当创建子节点的时候也会触发	。
 
 **结论：**创建子节点依然会回调上述所说的四个监听器。
 
@@ -788,9 +909,9 @@ public class CacheTest {
 
 控制台输出：
 
-![image-20230120185350193](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301201853255.png)
+![image-20230120203257819](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301202032866.png)
 
-当修改监听根节点`/ns1`的值的时候，`forNodeCache`、`forChanges`、`forAll`、`forCreatesAndChanges`四个监听器被触发。
+当修改监听根节点`/ns1`的值的时候，`forChanges`、`forAll`、`forCreatesAndChanges`四个监听器被触发。
 
 接下来再修改其子节点的值
 
@@ -798,11 +919,11 @@ public class CacheTest {
 
 控制台输出如下：
 
-![image-20230120185639458](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301201856556.png)
+![image-20230120203909407](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301202039450.png)
 
-依然回调`forNodeCache`、`forChanges`、`forAll`、`forCreatesAndChanges`四个监听器函数。
+依然回调`forChanges`、`forAll`、`forCreatesAndChanges`四个监听器函数。
 
-**结论：**修改监听节点以及其子节点都会触发`forNodeCache`、`forChanges`、`forAll`、`forCreatesAndChanges`监听器。
+**结论：**修改监听节点以及其子节点都会触发`forChanges`、`forAll`、`forCreatesAndChanges`监听器。
 
 ### ACL设置
 
@@ -826,7 +947,7 @@ public class CacheTest {
 
 控制台：
 
-![image-20230120193726177](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301201937259.png)
+![image-20230120204018629](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301202040684.png)
 
 删除子节点的时候会触发`forDeletes`、`forNodeCache`、`forAll`执行。
 
@@ -838,11 +959,11 @@ public class CacheTest {
 
 控制台输出：
 
-![image-20230120193920933](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301201939966.png)
+![image-20230120204106249](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301202041293.png)
 
 跟上面子节点的删除触发的监听器回调一样！
 
-**总结：**删除监听根节点以及其子节点会触发`forDeletes`、`forNodeCache`、`forAll`监听器。
+**总结：**删除监听根节点以及其子节点会触发`forDeletes`、`forAll`监听器。
 
 那么如果我删除的是一个父级节点呢？会出现什么情况？
 
@@ -856,11 +977,49 @@ public class CacheTest {
 
 控制台：
 
-![image-20230120200154415](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301202001470.png)
+![image-20230120204257817](https://itlab1024-1256529903.cos.ap-beijing.myqcloud.com/202301202042862.png)
 
 
 
-可以看到，级联删除，会多次触发`forDeletes`，根节点和其子节点的删除都会触发。同理`forAll`和`forNodeCache`也会多次触发。
+可以看到，级联删除，会多次触发`forDeletes`，根节点和其子节点的删除都会触发。同理`forAll`也会多次触发。
 
-**总结：**对于节点的删除，无论是单个删除还是级联删除，每个节点的删除都会触发`forDeletes`、`forAll`和`forNodeCache`监听器。
+**总结：**对于节点的删除，无论是单个删除还是级联删除，每个节点的删除都会触发`forDeletes`、`forAll`监听器。
+
+> 那么上面这些总结对吗？起码默认情况是对的！因为缓存我使用这样的方式创建的`CuratorCache curatorCache = CuratorCache.builder(curatorFramework, "/ns1").build();`
+
+## 说明
+
+上面我使用了命令行搭配代码的方式大致测试了下监听器的类型。接下来详细说明下各种监听器的作用。
+
+### forInitialized
+
+初始化完毕触发，也就是说`CuratorFramework`的`start`方法执行完毕后就会被触发。
+
+### forCreates
+
+触发条件： `CuratorCacheListener.Type.NODE_CREATED`，也就是说被监听节点或者子节点创建就会被触发。
+
+### forChanges
+
+触发条件： ` CuratorCacheListener.Type.NODE_CHANGED`，也就是说被监听节点或者子节点值修改就会被触发。
+
+### forCreatesAndChanges
+
+触发条件： ` CuratorCacheListener.Type.NODE_CREATED 和 CuratorCacheListener.Type.NODE_CHANGED`，也就是说被监听节点或者子节点创建或者值修改就会被触发。
+
+### forDeletes
+
+触发条件： ` CuratorCacheListener.Type.NODE_DELETED`，也就是说被监听节点或者子节点删除就会被触发。
+
+### forAll
+
+触发条件：上面的`forCreates`、`forChanges`、`forCreatesAndChanges`、`forDeletes`触发的时候都会同时触发`forAll`。
+
+### forNodeCache
+
+这是一种桥接监听器，它允许将旧式监听器`NodeCacheListener`（因为`NodeCache`类已经标记为弃用类）与`CuratorCache`重用
+
+```shell
+
+```
 
