@@ -1,8 +1,10 @@
 package com.itlab1024.curator;
 
+import org.apache.curator.RetryPolicy;
 import org.apache.curator.SessionFailedRetryPolicy;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
+import org.apache.curator.framework.imps.CuratorFrameworkState;
 import org.apache.curator.retry.RetryForever;
 import org.apache.curator.retry.RetryNTimes;
 import org.apache.curator.retry.RetryOneTime;
@@ -26,9 +28,22 @@ public class RetryTest {
      */
     @Test
     public void testSessionFailedRetryPolicy() throws Exception {
-        CuratorFramework curatorFramework = CuratorFrameworkFactory.newClient("localhost:2181", 10000, 10000,  new SessionFailedRetryPolicy(new RetryForever(2000)));
-        curatorFramework.start();
-        TimeUnit.MINUTES.sleep(1);
+        RetryPolicy sessionFailedRetryPolicy = new SessionFailedRetryPolicy(new RetryForever(1000));
+
+        CuratorFramework curatorFramework = null;
+        try{
+            //fluent 样式的API风格
+            curatorFramework = CuratorFrameworkFactory.builder()
+                    .connectString("localhost:2181")
+                    .sessionTimeoutMs(1000)
+                    .retryPolicy(sessionFailedRetryPolicy)
+                    .connectionTimeoutMs(1000)
+                    .build();
+            curatorFramework.start();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        TimeUnit.DAYS.sleep(1);
     }
 
     @Test
